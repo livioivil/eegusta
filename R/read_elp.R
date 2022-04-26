@@ -1,4 +1,7 @@
+#' Reads channel locations in elp format
 #' @export
+#' @param file file's name
+#' @return returns a tibble object with columns \code{.channel,radius,theta,phi,.x,.y,.z}.
 #' 
 # There are standards but the electrodes are not always in the standard 10-20 position. I created a dataset with those locations for 32 electrodes, layout_32_1020,  (which was what I needed so far). In the intro vignette, they weren't inside the vhdr (sometimes they are) so I had to load them:
 # https://bnicenboim.github.io/eeguana/articles/intro.html

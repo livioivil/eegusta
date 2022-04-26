@@ -8,4 +8,7 @@
 \description{
 EEGUana+STAtistics: eeguana-based tools for statistical analysis of eegdata.
 }
+\author{
+Livio Finos, Angela Andreella
+}
 \keyword{internal}

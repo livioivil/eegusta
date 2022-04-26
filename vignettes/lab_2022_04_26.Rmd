@@ -1,0 +1,231 @@
+---
+title: "lab_2022_04_26"
+author: "Livio Finos"
+date: '2022-04-26'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## eegUtils
+
+```{r}
+library(eegUtils)
+library(tidyverse)
+library(data.table)
+
+##########
+# https://github.com/craddm/eegUtils
+# eegUtils/vignettes/eegUtils.html
+# eegUtils/vignettes/epoch-handling.html
+# vedi anche:
+# eegUtils/vignettes/time-frequency-analysis.Rmd
+
+##########
+# dal sito:
+# https://osf.io/dxhjb/
+# scaricare il file Matt-task-spatcue.bdf digitando:
+# https://osf.io/hy5wq/download
+
+# library(httr)
+# GET("https://osf.io/hy5wq//?action=download",
+#     write_disk("./Matt-task-spatcue.bdf", overwrite = TRUE),
+#     progress()
+# )
+
+eeg_example <- import_raw("Matt-task-spatcue.bdf")
+
+#str(eeg_example)
+
+epoched_example <-
+  epoch_data(
+    eeg_example,
+    events = c(120,
+               122),
+    epoch_labels = c("valid_left",
+                     "valid_right"),
+    time_lim = c(-.1, .4),
+    baseline = c(-.1, 0)
+  )
+
+# str(epoched_example)
+
+epoched_example <- electrode_locations(epoched_example)
+channels(epoched_example)
+topoplot(epoched_example,
+         time_lim = c(.22, .24))
+
+```
+
+## eegusta
+```{r}
+# devtools::document("C:\\Users\\livio\\OneDrive\\Documenti\\github\\eegusta")
+# devtools::install("C:\\Users\\livio\\OneDrive\\Documenti\\github\\eegusta")
+# https://github.com/livioivil/eegusta
+
+# devtools::install_github("livioivil/eegusta")
+library(eegusta)
+```
+
+
+## eegUtils (eeg_data and eeg_epochs) vs eeguana (eeg_lst)
+```{r}
+ex=eegUtils2eeguana(
+  epoched_example
+)
+epoched_example$epochs
+# str(ex)
+ex$.segments
+
+```
+
+# Dati 2nd-level
+
+```{r}
+########### struttura dei dati eeg_data (eegUtils) e eeg_lst (eeguana)
+# scaricare:
+# https://github.com/angeella/ARIeeg/raw/master/inst/extdata/data_eeg_emotion.RData
+# GET("https://github.com/angeella/ARIeeg/raw/master/inst/extdata/data_eeg_emotion.RData",
+#     write_disk("./data_eeg_emotion.RData", overwrite = TRUE),
+#     progress()
+# )
+
+# https://github.com/angeella/ARIeeg/raw/master/inst/extdata/data_eeg_emotion_lst.RData
+# GET("https://github.com/angeella/ARIeeg/raw/master/inst/extdata/data_eeg_emotion_lst.RData",
+#     write_disk("./data_eeg_emotion_lst.RData", overwrite = TRUE),
+#     progress()
+# )
+
+library(eegUtils)
+load("data_eeg_emotion.RData")
+is(dati)
+# [1] "eeg_epochs"
+# str(dati)
+
+library(eeguana)
+load("data_eeg_emotion_lst.RData")
+is(data)
+# [1] "eeg_lst"
+# str(data)
+
+```
+
+
+
+## Lavorando sui nostri dati
+```{r}
+elec_position <- import_chans("canali.ced")
+tail(elec_position)
+elec_position <- elec_position[-nrow(elec_position),]
+
+D <- read_delim2eeg_data(file="../ERPDataforstudents/01_CarsERP.txt",
+                         chan_info = elec_position)
+
+topoplot(D, time_lim = c(.22, .24))
+
+Dg=eegUtils2eeguana(D)
+
+D$epochs
+Dg$.segments
+
+
+######################
+top_dir <- '../ERPDataforstudents/'
+all_files <- list.files(top_dir, full.names = T)
+elec_position <- import_chans("canali.ced")
+
+##############
+update_ids <- function(newD,refD){
+  newD$.signal$.id=newD$.signal$.id+max(refD$.signal$.id)
+  newD$.segments$.id=newD$.segments$.id+max(refD$.segments$.id)
+  newD$.segments$segment=newD$.segments$segment+max(refD$.segments$segment)
+  newD
+}
+
+
+D <- read_delim2eeg_data(file=all_files[1],
+                         chan_info = elec_position)
+D=eegUtils2eeguana(D)
+
+data_seg=D
+
+for(f_name_set in all_files[-1]){
+  D <- read_delim2eeg_data(file=f_name_set,
+                           chan_info = elec_position)
+  D=eegUtils2eeguana(D)
+  D=update_ids(newD=D,refD=data_seg)
+  
+  data_seg=bind(data_seg,D)
+}
+
+# str(data_seg)
+
+
+data_seg$.segments$participant_id=gsub("\\.txt","",basename(data_seg$.segments$participant_id))
+
+data_seg$.segments = data_seg$.segments %>% 
+  separate(participant_id, c("Subj", "condition"), "_")
+
+data_seg$.segments$event_type <- data_seg$.segments$epoch_labels <- data_seg$.segments$condition
+
+data_seg$.segments$Subj=factor(data_seg$.segments$Subj)
+data_seg$.segments$event_type=factor(data_seg$.segments$event_type)
+
+
+
+## vedi anche https://bnicenboim.github.io/eeguana/
+library(ggplot2)
+data_seg %>%
+  eeg_select(O1, O2, P7, P8) %>%
+  ggplot(aes(x = .time, y = .value)) +
+  geom_line(alpha = .1, aes(group = .id, color = condition)) +
+  stat_summary(
+    fun = "mean", geom = "line", alpha = 1, size = 1.5,
+    aes(color = condition)
+  ) +
+  facet_wrap(~.key) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = .17, linetype = "dotted") +
+  theme(legend.position = "bottom")
+
+
+
+data_seg%>%
+  eeg_filter(between(as_time(.sample, .unit = "milliseconds"), 140, 180)) %>%
+  eeg_group_by(condition) %>%
+  eeg_summarize(across_ch(mean, na.rm = TRUE)) %>%
+  plot_topo() +
+  annotate_head() +
+  geom_contour() +
+  geom_text(colour = "black") +
+  facet_grid(~condition)
+
+```
+
+```{r}
+# https://bnicenboim.github.io/eeguana/articles/intro.html
+data_segOP <-
+data_seg %>%
+  eeg_transmute(
+    Occipital = chs_mean(across(starts_with("O")), na.rm = TRUE), #O1, O2, Oz
+    Parietal = chs_mean(across(starts_with("P")), na.rm = TRUE) # P3, P4, P7, P8, Pz
+  )
+
+
+ERP_faces <- data_seg %>%
+  eeg_group_by(.sample, condition) %>%
+  eeg_summarize(across_ch(mean, na.rm = TRUE))
+  
+ERP_plot <- ERP_faces %>%
+  ggplot(aes(x = .time, y = .value)) +
+  geom_line(aes(color = condition)) +
+  facet_wrap(~.key) +
+  theme(legend.position = "bottom") +
+  ggtitle("Comparing Conditions") +
+  theme_eeguana()
+
+ERP_plot %>% plot_in_layout()
+```
+
