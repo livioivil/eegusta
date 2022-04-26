@@ -97,7 +97,7 @@ D=all_erp %>%
   lapply(., pivot_longer, -time, names_to = "elec", values_to = "amplitude") %>% 
   bind_rows(.id = "tmp_ID") %>% 
   separate(tmp_ID, c("ID", "condition"), "_") %>% 
-  filter(time > 165, time < 175) %>% 
+  filter(time > 140, time < 180) %>% 
   mutate(electrode = elec) %>% 
   select(-elec) %>% 
   group_by(ID, condition,electrode) %>%
@@ -106,6 +106,13 @@ D=all_erp %>%
 dim(D)
 str(D)
 table(D$ID,D$electrode,D$condition)
+
+# pari a dx e dispari a sx
+# anteriore sx F3, FC3 F7
+# anteriore dx F4, FC4 F8
+# posteriore sx P7, PO7 O1
+# posteriore dx P8, PO8 O2
+
 
 ```
 
