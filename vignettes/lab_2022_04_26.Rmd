@@ -151,7 +151,6 @@ D=eegUtils2eeguana(D)
 
 data_seg=D
 
-sink("trash")
 for(f_name_set in all_files[-1]){
   D <- read_delim2eeg_data(file=f_name_set,
                            chan_info = elec_position)
@@ -160,7 +159,6 @@ for(f_name_set in all_files[-1]){
   
   data_seg=bind(data_seg,D)
 }
-sink()
 
 # str(data_seg)
 
@@ -272,7 +270,7 @@ mod=obs2coeffWithin(Y~Cars_Faces*Scrambled, units=~Subj, data=dati)
 
 Y=mod$coeffWithin
 Y=Y[,-grep("Intercept",colnames(Y))]
-library(pecora)
+
 res=flip::flip(Y,perms = 10000)
 pvals=flip::t2p(res,obs.only = TRUE)[,]
 

@@ -623,7 +623,6 @@ D &lt;- read_delim2eeg_data(file=all_files[1],
 
 data_seg=D
 
-sink(&quot;trash&quot;)
 for(f_name_set in all_files[-1]){
   D &lt;- read_delim2eeg_data(file=f_name_set,
                            chan_info = elec_position)
@@ -3334,9 +3333,7 @@ for(f_name_set in all_files[-1]){
 ## Creating 1 epochs.
 ## 
 ## # Object size in memory 9.2 Mb</code></pre>
-<pre class="r"><code>sink()
-
-# str(data_seg)
+<pre class="r"><code># str(data_seg)
 
 
 data_seg$.segments$participant_id=gsub(&quot;\\.txt&quot;,&quot;&quot;,basename(data_seg$.segments$participant_id))
@@ -3538,18 +3535,13 @@ mod=obs2coeffWithin(Y~Cars_Faces*Scrambled, units=~Subj, data=dati)
 
 Y=mod$coeffWithin
 Y=Y[,-grep(&quot;Intercept&quot;,colnames(Y))]
-library(pecora)</code></pre>
-<pre><code>## 
-## Attaching package: &#39;pecora&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:flip&#39;:
-## 
-##     t2p</code></pre>
-<pre class="r"><code>res=flip::flip(Y,perms = 10000)
+
+res=flip::flip(Y,perms = 10000)
 pvals=flip::t2p(res,obs.only = TRUE)[,]
 
 summary(pvals)</code></pre>
 <pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##  0.0262  0.1780  0.4868  0.4742  0.7431  0.9954</code></pre>
+##  0.0238  0.1783  0.4942  0.4749  0.7358  0.9944</code></pre>
 <pre class="r"><code>sum(pvals&lt;.05)</code></pre>
 <pre><code>## [1] 3</code></pre>
 </div>
