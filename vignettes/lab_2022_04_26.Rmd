@@ -151,6 +151,7 @@ D=eegUtils2eeguana(D)
 
 data_seg=D
 
+sink("trash")
 for(f_name_set in all_files[-1]){
   D <- read_delim2eeg_data(file=f_name_set,
                            chan_info = elec_position)
@@ -159,6 +160,7 @@ for(f_name_set in all_files[-1]){
   
   data_seg=bind(data_seg,D)
 }
+sink()
 
 # str(data_seg)
 
@@ -173,6 +175,7 @@ data_seg$.segments$event_type <- data_seg$.segments$epoch_labels <- data_seg$.se
 data_seg$.segments$Subj=factor(data_seg$.segments$Subj)
 data_seg$.segments$event_type=factor(data_seg$.segments$event_type)
 
+save(data_seg,file="data_seg.Rdata")
 
 
 ## vedi anche https://bnicenboim.github.io/eeguana/
@@ -189,7 +192,6 @@ data_seg %>%
   geom_vline(xintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = .17, linetype = "dotted") +
   theme(legend.position = "bottom")
-
 
 
 data_seg%>%
@@ -227,5 +229,55 @@ ERP_plot <- ERP_faces %>%
   theme_eeguana()
 
 ERP_plot %>% plot_in_layout()
+```
+
+### Valori medi per soggetto/condizione
+
+```{r}
+D=data_seg%>%
+  eeg_filter(between(as_time(.sample, .unit = "milliseconds"), 140, 180)) %>%
+  eeg_group_by(.id,condition,Subj) %>%
+  eeg_summarize(across_ch(mean, na.rm = TRUE))
+
+head(D$.segments)
+head(D$.signal)
+
+```
+
+### un modello per soggetto
+
+```{r}
+library(flip)
+
+head(D$.segments)
+head(D$.signal)
+dati=merge(D$.signal,D$.segments,by=".id")
+dati$.recording <- dati$.sample <- dati$.id <- NULL
+Y=as.matrix(dati[,-(29:30)])
+
+
+dati$condition=factor(dati$condition)
+
+dati$Scrambled=dati$condition
+levels(dati$Scrambled)[1:2]="NotScrambled"
+levels(dati$Scrambled)[2:3]="Scrambled"
+contrasts(dati$Scrambled)=contr.sum
+
+dati$Cars_Faces=dati$condition
+levels(dati$Cars_Faces)=gsub("Scrambled","",levels(dati$Cars_Faces))
+levels(dati$Cars_Faces)=gsub("ERP","",levels(dati$Cars_Faces))
+contrasts(dati$Cars_Faces)=contr.sum
+
+mod=obs2coeffWithin(Y~Cars_Faces*Scrambled, units=~Subj, data=dati)
+
+Y=mod$coeffWithin
+Y=Y[,-grep("Intercept",colnames(Y))]
+library(pecora)
+res=flip::flip(Y,perms = 10000)
+pvals=flip::t2p(res,obs.only = TRUE)[,]
+
+summary(pvals)
+sum(pvals<.05)
+
 ```
 
