@@ -1,10 +1,10 @@
 Package: eegusta
 Version: 1.0.0
-Date: 2020-04-17
-Title: EEGUana+STAtistics: eeguana-based tools for statistical analysis of eegdata 
-Author: Livio Finos, for the time being
+Date: 2022-05-03
+Title: EEG Utilities and STatistical Analysis: eeguana-based tools for statistical analysis of EEG data 
+Author: Livio Finos, Antonio Maffei, Angela Andreella
 Maintainer: Livio Finos <livio.finos@unipd.it>
-Description: EEGUana+STAtistics: eeguana-based tools for statistical analysis of eegdata.
+Description: EEG Utilities and STatistical Analysis: eeguana-based tools for statistical analysis of eeg data. It contains a few utiliy functions and some examples of import, preprocessing and Statistical Analysis of EEG data (see Vignettes folder). This project is a work in progress.
 Encoding: UTF-8
 License: GPL-2
 RoxygenNote: 7.1.2
