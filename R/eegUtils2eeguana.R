@@ -17,6 +17,7 @@
 #' @importFrom dplyr tibble 
 #' @importFrom eeguana eeg_lst
 #' @importFrom eeguana channel_dbl
+#' @importFrom data.table as.data.table
 #' 
 eegUtils2eeguana <- function(data, reference = "", unit = "microvolt", resolution = 1){
   

@@ -1,0 +1,397 @@
+---
+title: "Cluster-mass for EEG data"
+author: "Angela Andreella"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{clustermass_EEG}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.align = "center",
+  echo = TRUE,
+  warnings = FALSE,
+  out.width = "500px",
+  dpi=150
+)
+options(rmarkdown.html_vignette.check_title = FALSE)
+```
+
+We will explain and apply in ``R`` the **permutation-based cluster-Mass** method proposed by [Maris and Oostenveld, 2007](https://doi.org/10.1016/j.jneumeth.2007.03.024) and developed in the ``R`` package ``permuco4brain`` by [Frossard and Renaud, 2018](https://cran.r-project.org/web/packages/permuco/vignettes/permuco_tutorial.pdf), using electroencephalography (EEG) data. The cluster-mass is computed considering: 
+
+- the time series of one channel: **temporal cluster-Mass**; 
+- the time series of multiple channels: **spatial-temporal cluster-mass**. 
+
+Finally, the **All-Resolution Inference** (ARI) from [Rosenblatt et al. 2018](https://doi.org/10.1016/j.neuroimage.2018.07.060) is applied to compute the lower bound for the true discovery proportion inside the clusters computed. Here, we will use the ``ARIeeg`` and ``hommel`` ``R`` packages.
+
+## Packages
+
+First of all, you need to install and load the following packages:
+
+```{r 1, warning=FALSE,message=FALSE}
+#devtools::install_github("angeella/ARIeeg")
+#devtools::install_github("bnicenboim/eeguana")
+#devtools::install_github("jaromilfrossard/permuco4brain")
+#devtools::install_github("jaromilfrossard/permuco")
+#devtools::install_github("livioivl/eegusta")
+library(ARIeeg) #to compute ARI for spatial-temporal clusters
+library(eeguana) #to manage eeg data
+library(eegusta) #to manage eeg data
+library(permuco4brain) #to compute the spatial-temporal clusters
+library(dplyr) 
+library(ggplot2)
+library(plotly)
+library(tidyverse)
+library(permuco) #to compute the temporal clusters
+library(hommel) #to compute ARI for temporal clusters
+library(abind)
+```
+
+## Data
+
+The Dataset from the package ```ARIeeg``` is an **ERP experiment** composed by:
+
+- 20 Subjects;
+- 32 Channels;
+- Stimuli: pictures. Conditions:
+    1. (f): fear (face);
+    2. (h): happiness (face);
+    3. (d): disgust (face);
+    4. (n): neutral (face);
+    5. (o): object.
+
+You can load it using:
+
+```{r 2}
+load(system.file("extdata", "data_eeg_emotion.RData", package = "ARIeeg"))
+```
+
+We transform the data as ```eeg_lst``` class object from the ``R`` package ```eeguana``` using the function ``eegUtils2eeguana`` from the ``R`` package ``eegusta``:
+
+```{r 3}
+dati_lst = eegUtils2eeguana(data = dati)
+is_eeg_lst(dati_lst) #check
+```
+
+and we drop off the final five channels: 
+
+```{r 4}
+chan_to_rm <- c("RM"  ,  "EOGvo" ,"EOGvu"
+                , "EOGhl", "EOGhr")
+dati_lst <- 
+  dati_lst %>%
+  dplyr::select(-one_of(chan_to_rm))
+```
+
+Finally, we segment the data and select two conditions, i.e., **disgust face**(number $3$) and **object** (number $5$):
+
+```{r 5, warning=FALSE,message=FALSE}
+data_seg <- dati_lst %>%
+  eeg_segment(.description %in% c(3,5),
+              .lim = c(min(dati$timings$time), max(dati$timings$time))
+  ) %>% eeg_baseline()  %>%
+  mutate(
+    condition =
+      description
+  ) %>%
+  dplyr::select(-c(type,description))
+```
+
+Some plots to understand the global mean difference between the two conditions:
+
+```{r}
+A<-data_seg %>%
+  select(Fp1,Fp2, F3, F4) %>%
+  ggplot(aes(x = .time, y = .value)) +
+  geom_line(aes(group = condition))  +
+  stat_summary(
+    fun = "mean", geom = "line", alpha = 1, size = 1,
+    aes(color = condition),show.legend = TRUE
+  ) +
+  facet_wrap(~.key) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = .17, linetype = "dotted") +
+  theme(legend.position = "bottom")+
+  scale_color_manual(labels = c("Disgust", "Object"), values = c("#80bfff", "#ff8080"))
+A
+```
+
+if you want an interactive plot, you can use the function ``ggplotly`` from the package ``plotly``:
+
+```{r}
+pp <- plotly::ggplotly(A, width=300, height=300)    
+ppc <- htmltools::div( pp, align="center" )  # Result is now an HTML object
+htmltools::save_html( ppc, "test.html" )     # Use in place of htmlwidgets::saveWidget()
+```
+
+## Theory
+
+### Multiple testing problem?
+
+The aim is to test if the difference in brain signal during the two conditions is different from $0$ for each time point, i.e., $500$. If the full set of channels is considered, we also have tests for each channel, i.e., $27$, returning a total number of tests equals $500 \cdot 27$. Therefore, we have $500$ or $500 \cdot 27$ statistical tests to perform at group-level, so considering the **random subject effect**. The multiple testing problem is obvious, and correction methods such as Bonferroni or similar do not capture the time(-spatial) correlation structure of the statistical tests; it will be a conservative method.
+
+The cluster mass method is then used, proposed by [Maris and Oostenveld, 2007](https://doi.org/10.1016/j.jneumeth.2007.03.024). It is based on **permutation theory**;  it gains some power with respect to other procedures correcting at the (spatial-)temporal cluster level instead of at the level of single tests. It is similar to the cluster mass approach in the fMRI framework, but in this case, the *voxels*, i.e., the single object of the analysis, are expressed in terms of time-points or combination time-points/channels. The method can then gain some power with respect to some traditional conservative FWER correction methods exploiting the (spatial-)temporal structure of the data.
+
+### Repeated Measures ANOVA Model
+
+The cluster mass method is based on the **repeated measures ANOVA** model, i.e.,
+
+$$
+y = 1_{N \times 1} \mu +  X^{\eta} \eta  +  X^{\pi}\pi +   X^{\eta \pi}\eta \pi + \epsilon
+$$
+
+where $1_{N \times 1}$ is a matrix with ones and
+
+  1. $\mu$ is the **intercept**;
+  2. $y \in \mathbb{R}^{N \times 1}$ is the response variables, i.e., the **signal**, in our case $N = n_{subj} \times n_{stimuli} = 40$;
+  3. $X^{\eta} \in \mathbb{R}^{N \times n_{stimuli}}$ is the **design matrix** describing the **fixed effect** regarding the stimuli, and $\eta \in \mathbb{R}^{n_{stimuli} \times 1}$ the corresponding parameter of interest;
+  4. $X^{\pi} \in \mathbb{R}^{N \times n_{subj}}$ is the **design matrix** describing the **random effect** regarding the subjects, and $\pi \in \mathbb{R}^{n_{subj} \times 1}$ the corresponding parameter.
+  5. $X^{\eta \pi}$ is the **design matrix** describing the **interaction effects** between subjects and conditions, and $\eta \pi$ the corresponding parameter;
+  6. $\epsilon \in \mathbb{R}^{N \times 1}$ is the **error term** with $0$ mean and variance $\sigma^2 I_N$.
+
+Therefore, $y \sim (1\mu + X^{\eta} \eta, \Sigma)$, $\pi \sim (0, \sigma^2_{\pi} I_{n_{subj}})$ and $\eta \pi \sim (0,\text{cov}(\eta \pi))$. (N.B: $\eta \pi$ is not the product between $\eta$ and $\pi$ but refers to the **interaction effects** between subjects and conditions).
+
+We want to make inference on $\eta$, such that $H_0: \eta = 0$ vs $H_1: \eta \ne 0$. We do that using the **F statistic**, i.e.,
+
+$$
+F = \dfrac{y^\top H_{X^{\eta}} y / (n_{stimuli} - 1)}{ y^\top H_{X^{\eta \pi}}y/(n_{stimuli} -1)(n_{subj} -1)} 
+$$
+where $H_{X}$ is the **projection matrix**, i.e., $H_{X} = X(X^\top X)^{-1} X^\top$. In order to compute this test, we use an alternative definition of $F$ based on the residuals:
+
+$$
+F_r = \dfrac{r^\top H_{X^{\eta}} r / (n_{stimuli} - 1)}{ r^\top H_{X^{\eta \pi}}r/(n_{stimuli} -1)(n_{subj} -1)} 
+$$
+
+where $r = (H_{X^{\eta}} + H_{X^{\eta\pi}})y$. For further details, see [Kherad Pajouh and Renaud, 2014](https://link.springer.com/article/10.1007/s00362-014-0617-3).
+
+So, let the group of permutation, including the identity transformation, $\mathcal{P}$, we use $r^\star = P r$, where $P \in \mathcal{P}$ to compute the null distribution of our test, i.e., $\mathcal{R}$, and then the p-value, i.e.,
+
+$$
+\text{p-value} = \dfrac{1}{B} \sum_{F^\star_r \in \mathcal{R}} \mathbb{I}(|F^\star_r| \ge |F_r|)
+$$
+
+if the two-tailed is considered, where $F^\star_r = f(r^\star)$.
+
+We have this model for each time point $t \in \{1, \dots, 500\}$ and each channel, so finally we will have $n_{\text{time-points}} \times n_{\text{channels}}$ statistical tests/p-values (raw).
+
+### Temporal Cluster mass
+
+This method has been proposed by [Maris and Oostenveld, 2007](https://doi.org/10.1016/j.jneumeth.2007.03.024). It assumes that an effect will appear in clusters of adjacent time frames. Having statistics for each time point, we form these clusters using a threshold $\tau$ as follows:
+
+<div style="text-align:center" markdown="1">
+![Example of cluster mass EEG from [Frossard, 2019](10.13097/archive-ouverte/unige:125617)](Image/clusterMass.JPG){width=50%}
+</div>
+
+All contiguous time points with statistics above this threshold define a single cluster $C_i$ with $i \in \{1, \dots, n_C\}$, where $n_C$ is the number of clusters found. For each time point in the same cluster $C_i$, we assign the same cluster mass statistic $m_i = f(C_i)$, where $f$ is the function that summarizes the statistics of the entire cluster. Typically, it is the sum of the $F$ statistics. The null distribution of the cluster mass $\mathcal{M}$ is computed by iterating the above process for each permutation. The contribution of a permutation to the cluster-mass null distribution is the maximum overall cluster mass of that permutation. To check the significance of the cluster $C_i$ of interest, we compare its cluster mass $m_i = f(C_i)$ with the cluster mass null distribution $\mathcal{M}$. Therefore, for each cluster $C_i$, we have the associated p-values computed as
+
+$$
+p_i = \dfrac{1}{n_P} \sum_{m^\star \in \mathcal{M}} I\{m^\star  \ge m_i\}
+$$
+
+where $m^\star \in \mathcal{M}$ is then calculated given permutation statistics. This method makes sense when analysing EEG data because if a difference in brain activity is thought to occur at time $s$ for a given factor, then it is very likely that this difference will also occur at time $s + 1$ (or $s - 1$).
+
+### Spatial-temporal Cluster mass 
+
+In this case, we use graph theory, where vertices represent channels and edges represent **relationships**. The adjacency must be defined using prior information, so a three-dimensional Euclidean distance between channels is used. Two channels are defined as adjacent if their Euclidean distance is less than the threshold $\delta$, where $\delta$ is the smallest Euclidean distance that yields an adjacent graph. This follows from the fact that there is no unconnected subgraph for a connected graph. The existence of subgraphs implies that some trials cannot be constructed in the same cluster, which is not a useful assumption for the present analysis ([Frossard and Renaud, 2018](https://cran.r-project.org/web/packages/permuco/vignettes/permuco_tutorial.pdf); [Frossard, 2019](10.13097/archive-ouverte/unige:125617)).
+
+Once we have a definition of spatial contiguity, we need to define temporal contiguity. We reproduce this graph $n_{\text{time-points}}$ times, and we have edges between pairs of two vertices associated to the same electrode if they are temporally adjacent. The final graph has a total number of vertices, i.e., number of tests, equals ($n_{\text{channels}} \times n_{\text{time-points}}$). The following figure shows an example with $64$ channels and $3$ time measures:
+
+<div style="text-align:center" markdown="1">
+![Example of graph of adjacency from [Frossard, 2019](10.13097/archive-ouverte/unige:125617)](Image/cluster.JPG){width=50%}
+</div>
+
+We then delete all the vertices in which statistics are below a threshold, e.g., the $95$ percentile of the null distribution of the $F$ statistics. So, we have a new graph composed of **multiple connected components**, where each connected component defines the spatial-temporal cluster. We compute for each spatial-temporal cluster the cluster-mass statistic as before.
+
+The cluster-mass null distribution is calculated using permutations that preserve the spatial-temporal correlation structure of the statistical tests, i.e., no changing the position of the electrodes and mixing the time points.
+We construct a three-dimensional array, where the first dimension represents the design of our experiments (subjects of $\times$ stimuli), the second one the time points, and the third one the electrodes. So, we apply permutations only in the first dimension using the method proposed by [Kherad Pajouh and Renaud, 2014](https://link.springer.com/article/10.1007/s00362-014-0617-3). 
+
+## Application
+
+In R, all of this is possible thanks to the ``permuco`` and ``permuco4brain`` packages developed by [Frossard and Renaud, 2018](https://cran.r-project.org/web/packages/permuco/vignettes/permuco_tutorial.pdf).
+
+### Temporal Cluster-Mass
+
+So, we select one channel from our dataset, e.g. the **Fp1**:
+
+```{r}
+Fp1 <- data_seg %>% select(Fp1)
+```
+
+1. Construct the $y$. We need to construct the three-dimensional **signal matrix**, having dimensions $40 \times 500$:
+
+```{r}
+signal_Fp1 <- Fp1%>%
+    signal_tbl()%>%
+    group_by(.id)%>%
+    nest()%>% #creates a list-column of 40 data frames having dim 500 x 2
+    mutate(data = map(data,~as.matrix(.x[-1])))%>% #drop off the first column of each dataframe, i.e., we take the column oof the signal for channel Fp1
+    pull(data)%>% #takes data created in mutate
+    invoke(abind,.,along = 2)%>% #we merge each dataframe in order to have one db having dimension 500 x 40
+    aperm(c(2,1)) #traspose
+dim(signal_Fp1) 
+```
+
+So, ``signal_Fp1`` is a data frame that expresses the channel **Fp1** signals under two conditions in $500$ time points for $20$ subjects.
+
+2. Construct the $X^{\eta \pi}$, having dimensions $40 \times 2$:
+
+```{r}
+design <- 
+  segments_tbl(Fp1)%>%
+  select(participant_id, condition)
+dim(design)
+```
+
+3. Define the **repeated measures ANOVA formula**: 
+
+```{r}
+f <- signal_Fp1 ~ condition + Error(participant_id/(condition))
+```
+
+In the formula, we need to specify the ``Error(.)`` term since we are dealing with a repeated measures design. We specify a subject-level random effect and a condition fixed effect nested within subjects.
+
+Thanks to the ``permuco`` package, we can apply the temporal cluster-Mass for the channel **Fp1**:
+
+```{r}
+
+lm_Fp1 <- clusterlm(f,data = design)
+summary(lm_Fp1)
+```
+
+Here we can see:
+
+- The threshold used to construct the temporal clusters, i.e., `r lm_Fp1$threshold`;
+- The type of cluster mass function, i.e., the sum of single statistical tests time contiguous; 
+- When the cluster starts and ends, the value of the cluster mass and the associated corrected p-values.
+
+For example, considering the first significant cluster, we can compute the cluster mass as:
+
+```{r}
+sum(lm_Fp1$multiple_comparison$condition$uncorrected$main[c(170:210), "statistic"])
+```
+
+
+We can also plot the temporal clusters:
+
+```{r}
+plot(lm_Fp1)
+```
+
+The red dots represent the significant temporal cluster for the channel **Fp1** composed by the time points from $170$ to $210$ using a threshold equals $4.098$. 
+
+#### ARI in EEG cluster mass
+
+However, our significant cluster says only that at least one test is different from $0$, we don't know how many tests/time-points are significant (**spatial specificity paradox**). So, we can apply ARI to understand the lower bound of the number of true discovery proportion. The cluster is composed by the time points from $170$ to $210$, i.e., the size of the cluster is equal to $41$.
+
+```{r}
+praw <- lm_Fp1$multiple_comparison$condition$uncorrected$main[,2]
+cluster <- c(170:210)
+
+discoveries(hommel(praw), ix = cluster)/length(cluster)*100
+```
+
+Therefore, we have at least `r round(discoveries(hommel(praw), ix = cluster)/length(cluster)*100,3)`$\%$ of true active time points in the cluster computed.
+
+### Spatial-Temporal Cluster-Mass
+
+1. Construct the $y$. We need to construct the three-dimensional **signal array**, having dimensions $40 \times 500 \times 27$:
+
+```{r 7}
+signal <- 
+    data_seg%>%
+    signal_tbl()%>%
+    group_by(.id)%>%
+    nest()%>%
+    mutate(data = map(data,~as.matrix(.x[-1])))%>%
+    pull(data)%>%
+    invoke(abind,.,along = 3)%>%
+    aperm(c(3,1,2))
+
+dim(signal)
+```
+
+2. Construct the $X^{\eta \pi}$, having dimensions $40 \times 2$:
+
+```{r 8}
+design <- 
+  segments_tbl(data_seg)%>%
+  select(participant_id, condition)
+dim(design)
+```
+
+3. Construct the **graph**, using $\delta = 53mm$ (the maximal distance for adjacency of two channels) and the function ``position_to_graph`` from the ``permuco4brain`` package:
+
+```{r fig.align="center"}
+graph <- position_to_graph(channels_tbl(data_seg), name = .channel, delta = 53,
+                             x = .x, y = .y, z = .z)
+plot(graph)
+```
+
+4. Define the **repeated measures ANOVA formula**: 
+
+```{r 10}
+f <- signal ~ condition + Error(participant_id/(condition))
+```
+
+Finally, run the main function:
+
+```{r}
+model <- permuco4brain::brainperm(formula = f,
+                                  data = design,
+                                  graph = graph,
+                                  np = 1000,
+                                  multcomp = "clustermass",
+                                  return_distribution = TRUE)
+```
+
+where np indicates the number of permutation.
+
+Then, we can analyze the output:
+
+```{r}
+print(model)
+```
+
+We have only two significant clusters. The first one is composed by $25$ channels while the second one by $8$ channels, with main channels P7. You can see in details the components of this cluster in
+
+```{r}
+head(names(model$multiple_comparison$condition$clustermass$cluster$membership[which(as.vector(model$multiple_comparison$condition$clustermass$cluster$membership)==3)]))
+```
+
+You can see the significant cluster (in red) at fixed time points (e.g. 300) using plot:
+
+```{r}
+plot(model, samples = 300)
+```
+
+and the significant cluster over time and over channels using:
+
+```{r}
+image(model)
+```
+
+where the significant clusters are represented in a colour-scale and the non-significant one in grey. The white pixels are tests which statistic are below the threshold.
+
+#### ARI in EEG cluster mass
+
+However, our significant clusters say only that at least one combination channels/time-points is different from $0$, we do not know how many combinations are significant (**spatial specificity paradox**). So, we can apply ARI to understand the lower bound of the number of true discovery proportion:
+
+```{r}
+ARIeeg::ARIeeg(model = model)
+```
+
+
+# References
+
+ - Maris, E., & Oostenveld, R. (2007). Nonparametric statistical testing of EEG-and MEG-data. Journal of neuroscience methods, 164(1), 177-190.
+
+ - Kherad-Pajouh, S., & Renaud, O. (2015). A general permutation approach for analyzing repeated measures ANOVA and mixed-model designs. Statistical Papers, 56(4), 947-967.
+ 
+ - Frossard, J. (2019). Permutation tests and multiple comparisons in the linear models and mixed linear models, with extension to experiments using electroencephalography. DOI: 10.13097/archive-ouverte/unige:125617.
+ 
+ - Frossard, J. & O. Renaud (2018). Permuco: Permutation Tests for Regression, (Repeated Measures) ANOVA/ANCOVA and Comparison of Signals. R Packages.

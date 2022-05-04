@@ -4,11 +4,11 @@
 \name{eegusta-package}
 \alias{eegusta}
 \alias{eegusta-package}
-\title{eegusta: EEGUana+STAtistics: eeguana-based tools for statistical analysis of eegdata}
+\title{EEG Utilities and STatistical Analysis: eeguana-based tools for statistical analysis of EEG data}
 \description{
-EEGUana+STAtistics: eeguana-based tools for statistical analysis of eegdata.
+EEG Utilities and STatistical Analysis: eeguana-based tools for statistical analysis of eeg data. It contains a few utiliy functions and some examples of import, preprocessing and Statistical Analysis of EEG data (see Vignettes folder). This project is a work in progress.
 }
 \author{
-Livio Finos, Angela Andreella
+Livio Finos, Antonio Maffei, Angela Andreella
 }
-\keyword{internal}
+\keyword{eeg}
