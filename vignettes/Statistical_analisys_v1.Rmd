@@ -51,6 +51,40 @@ str(D)
 # posteriore sx P7, PO7 O1
 # posteriore dx P8, PO8 O2
 
+# D=data.frame(D)
+# D$ROI=factor(D$electrode)
+# levels(D$ROI)=gsub("F3","Ant_Left",levels(D$ROI))
+# levels(D$ROI)=gsub("FC3","Ant_Left",levels(D$ROI))
+# levels(D$ROI)=gsub("C7","Ant_Left",levels(D$ROI))
+# 
+# levels(D$ROI)=gsub("F4","Ant_Right",levels(D$ROI))
+# levels(D$ROI)=gsub("FC4","Ant_Right",levels(D$ROI))
+# levels(D$ROI)=gsub("C8","Ant_Right",levels(D$ROI))
+# 
+# levels(D$ROI)=gsub("P7","Post_Left",levels(D$ROI))
+# levels(D$ROI)=gsub("PO7","Post_Left",levels(D$ROI))
+# levels(D$ROI)=gsub("O1","Post_Left",levels(D$ROI))
+# 
+# levels(D$ROI)=gsub("P8","Post_Right",levels(D$ROI))
+# levels(D$ROI)=gsub("PO8","Post_Right",levels(D$ROI))
+# levels(D$ROI)=gsub("O2","Post_Right",levels(D$ROI))
+
+
+# Create ROIs
+D <- D %>%
+  mutate(ROI = case_when(
+    electrode %in% c("F3","FC3","F7") ~ "ant_sx",
+    electrode %in% c("F4","FC4","F8") ~ "ant_dx",
+    electrode %in% c("P7","PO7","O1") ~ "pos_sx",
+    electrode %in% c("P8","PO8","O2") ~ "pos_dx"
+  )) %>%
+  drop_na() %>%
+  group_by(ID, condition, ROI) %>%
+  summarise(amplitude = mean(amplitude))
+levels(D$ROI)[!(levels(D$ROI)%in%c("Ant_Left","Ant_Right","Post_Left","Post_Right"))]=NA
+
+levels(D$ROI)
+
 D=all_erp %>% 
   lapply(., pivot_longer, -time, names_to = "elec", values_to = "amplitude") %>% 
   bind_rows(.id = "tmp_ID") %>% 
@@ -58,7 +92,7 @@ D=all_erp %>%
   filter(time > 140, time < 180) %>% 
   mutate(electrode = elec) %>% 
   select(-elec) %>% 
-  group_by(ID, condition,electrode) %>%
+  group_by(ID, condition,ROI) %>%
   summarise(amplitude = mean(amplitude))
 
 
