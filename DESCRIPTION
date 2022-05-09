@@ -8,3 +8,7 @@ Description: EEG Utilities and STatistical Analysis: eeguana-based tools for sta
 Encoding: UTF-8
 License: GPL-2
 RoxygenNote: 7.1.2
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
