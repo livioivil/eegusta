@@ -123,10 +123,8 @@ A
 
 if you want an interactive plot, you can use the function ``ggplotly`` from the package ``plotly``:
 
-```{r}
-pp <- plotly::ggplotly(A, width=300, height=300)    
-ppc <- htmltools::div( pp, align="center" )  # Result is now an HTML object
-htmltools::save_html( ppc, "test.html" )     # Use in place of htmlwidgets::saveWidget()
+```{r, warning=FALSE}
+plotly::ggplotly(A)    
 ```
 
 ## Theory
