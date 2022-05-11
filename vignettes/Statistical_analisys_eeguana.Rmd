@@ -1,0 +1,180 @@
+---
+title: "Statistical Analysis eeguana format"
+author: "Livio Finos"
+date: '2022-04-26'
+output: 
+  html_document: 
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## load data
+
+```{r}
+library(eegUtils)
+library(tidyverse)
+library(data.table)
+library(eeguana)
+
+## see also Import_data_GroupLevel_eeguana_format.Rmd
+load(file="../data-raw/all_erp_eeguana.Rdata")
+
+
+## vedi anche https://bnicenboim.github.io/eeguana/
+library(ggplot2)
+all_erp %>%
+  eeg_select(O1, O2, P7, P8) %>%
+  ggplot(aes(x = .time, y = .value)) +
+  geom_line(alpha = .1, aes(group = .id, color = Condition)) +
+  stat_summary(
+    fun = "mean", geom = "line", alpha = 1, size = 1.5,
+    aes(color = Condition)
+  ) +
+  facet_wrap(~.key) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = .17, linetype = "dotted") +
+  theme(legend.position = "bottom")
+
+
+all_erp%>%
+  eeg_filter(between(as_time(.sample, .unit = "milliseconds"), 140, 180)) %>%
+  eeg_group_by(Condition) %>%
+  eeg_summarize(across_ch(mean, na.rm = TRUE)) %>%
+  plot_topo() +
+  annotate_head() +
+  geom_contour() +
+  geom_text(colour = "black") +
+  facet_grid(~Condition)
+
+```
+
+```{r}
+
+# pari a dx e dispari a sx
+# anteriore sx F3, FC3 F7
+# anteriore dx F4, FC4 F8
+# posteriore sx P7, PO7 O1
+# posteriore dx P8, PO8 O2
+
+
+
+# https://bnicenboim.github.io/eeguana/articles/intro.html
+
+ERP_faces <- all_erp %>%
+  eeg_group_by(.sample, Condition) %>%
+  eeg_summarize(across_ch(mean, na.rm = TRUE))
+  
+ERP_plot <- ERP_faces %>%
+  ggplot(aes(x = .time, y = .value)) +
+  geom_line(aes(color = Condition)) +
+  facet_wrap(~.key) +
+  theme(legend.position = "bottom") +
+  ggtitle("Comparing Conditions") +
+  theme_eeguana()
+
+ERP_plot %>% plot_in_layout()
+```
+
+# Crea Dataset Analysis
+
+## Crea Meta-canali (aree)
+
+```{r}
+all_erp4 <-
+all_erp %>%
+  eeg_transmute(
+    Ant_Left = chs_mean(across(c("F3","FC3","F7")), na.rm = TRUE), 
+    Ant_Right = chs_mean(across(c("F4","FC4","F8")), na.rm = TRUE), 
+    Post_Left = chs_mean(across(c("P7","PO7","O1")), na.rm = TRUE), 
+    Post_Right = chs_mean(across(c("P8","PO8","O2")), na.rm = TRUE), 
+  )
+
+
+```
+
+##Valori medi per soggetto/condizione
+
+```{r}
+D=all_erp4%>%
+  eeg_filter(between(as_time(.sample, .unit = "milliseconds"), 140, 180)) %>%
+  eeg_group_by(.id,Condition,Subj) %>%
+  eeg_summarize(across_ch(mean, na.rm = TRUE))
+
+head(D$.segments)
+head(D$.signal)
+
+```
+
+## Crea dataset
+
+```{r}
+
+head(D$.segments)
+head(D$.signal)
+dati=tibble(merge(D$.signal,D$.segments,by=".id"))
+dati$.recording <- dati$.sample <- dati$.id <- NULL
+
+  
+```
+
+## Wide to Long format
+
+```{r}
+dati_long=
+  dati %>%
+   pivot_longer(1:4, names_to = 'Chan')
+
+```
+
+# Anova per Misure ripetute
+
+A VOI...
+
+# Linear Mixed Model
+
+A VOI...
+
+
+# Test di permutazione per Misure Ripetute (random coefficient analsys) 
+
+## Un modello per soggetto
+
+Potremmo usare i dati in formato Long con la stessa logica usata per i mixed models.
+Oppure possiamo analizzare i 4 (meta-)canali separatamente. In questa esercitazione scegliamo questa seconda possibilità
+
+```{r}
+library(flip)
+
+
+Y=as.matrix(dati[,-(5:6)])
+
+
+dati$Condition=factor(dati$Condition)
+
+dati$Scrambled=dati$Condition
+levels(dati$Scrambled)[1:2]="NotScrambled"
+levels(dati$Scrambled)[2:3]="Scrambled"
+contrasts(dati$Scrambled)=contr.sum
+
+dati$Cars_Faces=dati$Condition
+levels(dati$Cars_Faces)=gsub("Scrambled","",levels(dati$Cars_Faces))
+levels(dati$Cars_Faces)=gsub("ERP","",levels(dati$Cars_Faces))
+contrasts(dati$Cars_Faces)=contr.sum
+
+mod=obs2coeffWithin(Y~Cars_Faces*Scrambled, units=~Subj, data=dati)
+
+Y=mod$coeffWithin
+Y=Y[,-grep("Intercept",colnames(Y))]
+
+res=flip::flip(Y,perms = 10000)
+pvals=flip::t2p(res,obs.only = TRUE)[,]
+
+summary(pvals)
+
+res
+
+```
+

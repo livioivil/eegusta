@@ -1,0 +1,101 @@
+---
+title: "Statistical Analisys"
+author: "Livio Finos and Antonio Maffei"
+date: "09/05/2022"
+output: 
+  html_document: 
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+
+library(tidyverse)
+
+#see also Import_and_visualize_GroupLevel.Rmd
+load(file="../data-raw/all_erp.Rdata")
+
+#elec_position <- import_chans("canali.ced")
+```
+
+
+## Prepare the data.frame
+
+```{r}
+
+D=all_erp %>% 
+  lapply(., pivot_longer, -time, names_to = "elec", values_to = "amplitude") %>% 
+  bind_rows(.id = "tmp_ID") %>% 
+  separate(tmp_ID, c("ID", "condition"), "_") %>% 
+  filter(time > 140, time < 180) %>% 
+  mutate(electrode = elec) %>% 
+  select(-elec) %>% 
+  group_by(ID, condition,electrode) %>%
+  summarise(amplitude = mean(amplitude))
+
+
+
+dim(D)
+# just to avoid visualization issues of str()
+attr(D,"groups") <- NULL
+# check the dataset:
+str(D)
+
+# check results:
+# head(table(D$ID,D$electrode,D$condition))
+#should be all ones
+
+# pari a dx e dispari a sx
+# anteriore sx F3, FC3 F7
+# anteriore dx F4, FC4 F8
+# posteriore sx P7, PO7 O1
+# posteriore dx P8, PO8 O2
+
+# D=data.frame(D)
+# D$ROI=factor(D$electrode)
+# levels(D$ROI)=gsub("F3","Ant_Left",levels(D$ROI))
+# levels(D$ROI)=gsub("FC3","Ant_Left",levels(D$ROI))
+# levels(D$ROI)=gsub("C7","Ant_Left",levels(D$ROI))
+# 
+# levels(D$ROI)=gsub("F4","Ant_Right",levels(D$ROI))
+# levels(D$ROI)=gsub("FC4","Ant_Right",levels(D$ROI))
+# levels(D$ROI)=gsub("C8","Ant_Right",levels(D$ROI))
+# 
+# levels(D$ROI)=gsub("P7","Post_Left",levels(D$ROI))
+# levels(D$ROI)=gsub("PO7","Post_Left",levels(D$ROI))
+# levels(D$ROI)=gsub("O1","Post_Left",levels(D$ROI))
+# 
+# levels(D$ROI)=gsub("P8","Post_Right",levels(D$ROI))
+# levels(D$ROI)=gsub("PO8","Post_Right",levels(D$ROI))
+# levels(D$ROI)=gsub("O2","Post_Right",levels(D$ROI))
+
+
+# Create ROIs
+D <- D %>%
+  mutate(ROI = case_when(
+    electrode %in% c("F3","FC3","F7") ~ "ant_sx",
+    electrode %in% c("F4","FC4","F8") ~ "ant_dx",
+    electrode %in% c("P7","PO7","O1") ~ "pos_sx",
+    electrode %in% c("P8","PO8","O2") ~ "pos_dx"
+  )) %>%
+  drop_na() %>%
+  group_by(ID, condition, ROI) %>%
+  summarise(amplitude = mean(amplitude))
+levels(D$ROI)[!(levels(D$ROI)%in%c("Ant_Left","Ant_Right","Post_Left","Post_Right"))]=NA
+
+levels(D$ROI)
+
+D=all_erp %>% 
+  lapply(., pivot_longer, -time, names_to = "elec", values_to = "amplitude") %>% 
+  bind_rows(.id = "tmp_ID") %>% 
+  separate(tmp_ID, c("ID", "condition"), "_") %>% 
+  filter(time > 140, time < 180) %>% 
+  mutate(electrode = elec) %>% 
+  select(-elec) %>% 
+  group_by(ID, condition,ROI) %>%
+  summarise(amplitude = mean(amplitude))
+
+
+
+```
+
