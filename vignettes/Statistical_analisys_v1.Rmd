@@ -19,83 +19,48 @@ load(file="../data-raw/all_erp.Rdata")
 ```
 
 
-## Prepare the data.frame
+## Prepare the data.frame ready to be modeled
+Starting from the list of all the individual data files (`r all_erp`), we do the following steps:
+- Bind the list in a single data.frame
+- Create two virtual channels (ROI - Region Of Interest) for the left and right posterior electrodes
+- Split the variable `r condition`, into two new variables to be able to model the type of stimulus (Car or Face) and its visibility (Normal or Scrambled)
+- Filter the data into the time window of interest (140-180 ms)
+- Summarise the mean amplitude for each subject, condition and ROI
 
 ```{r}
 
-D=all_erp %>% 
+D = all_erp %>% 
   lapply(., pivot_longer, -time, names_to = "elec", values_to = "amplitude") %>% 
   bind_rows(.id = "tmp_ID") %>% 
   separate(tmp_ID, c("ID", "condition"), "_") %>% 
-  filter(time > 140, time < 180) %>% 
-  mutate(electrode = elec) %>% 
-  select(-elec) %>% 
-  group_by(ID, condition,electrode) %>%
-  summarise(amplitude = mean(amplitude))
-
-
-
-dim(D)
-# just to avoid visualization issues of str()
-attr(D,"groups") <- NULL
-# check the dataset:
-str(D)
-
-# check results:
-# head(table(D$ID,D$electrode,D$condition))
-#should be all ones
-
-# pari a dx e dispari a sx
-# anteriore sx F3, FC3 F7
-# anteriore dx F4, FC4 F8
-# posteriore sx P7, PO7 O1
-# posteriore dx P8, PO8 O2
-
-# D=data.frame(D)
-# D$ROI=factor(D$electrode)
-# levels(D$ROI)=gsub("F3","Ant_Left",levels(D$ROI))
-# levels(D$ROI)=gsub("FC3","Ant_Left",levels(D$ROI))
-# levels(D$ROI)=gsub("C7","Ant_Left",levels(D$ROI))
-# 
-# levels(D$ROI)=gsub("F4","Ant_Right",levels(D$ROI))
-# levels(D$ROI)=gsub("FC4","Ant_Right",levels(D$ROI))
-# levels(D$ROI)=gsub("C8","Ant_Right",levels(D$ROI))
-# 
-# levels(D$ROI)=gsub("P7","Post_Left",levels(D$ROI))
-# levels(D$ROI)=gsub("PO7","Post_Left",levels(D$ROI))
-# levels(D$ROI)=gsub("O1","Post_Left",levels(D$ROI))
-# 
-# levels(D$ROI)=gsub("P8","Post_Right",levels(D$ROI))
-# levels(D$ROI)=gsub("PO8","Post_Right",levels(D$ROI))
-# levels(D$ROI)=gsub("O2","Post_Right",levels(D$ROI))
-
-
-# Create ROIs
-D <- D %>%
-  mutate(ROI = case_when(
-    electrode %in% c("F3","FC3","F7") ~ "ant_sx",
-    electrode %in% c("F4","FC4","F8") ~ "ant_dx",
-    electrode %in% c("P7","PO7","O1") ~ "pos_sx",
-    electrode %in% c("P8","PO8","O2") ~ "pos_dx"
+  # Creates the ROI (two posterior ROI, one on the left and one on the right)
+  mutate(roi = case_when(
+    elec %in% c("PO8", "O2", "P8") ~ "pos_dx",
+    elec %in% c("PO7", "O1", "P7") ~ "pos_sx",
   )) %>%
   drop_na() %>%
-  group_by(ID, condition, ROI) %>%
-  summarise(amplitude = mean(amplitude))
-levels(D$ROI)[!(levels(D$ROI)%in%c("Ant_Left","Ant_Right","Post_Left","Post_Right"))]=NA
+  # Creates two new variables stimulus and modality. Stimulus contains info about the type 
+  # of stimulus (Car or Face). modality contains info about the visbility (Normal or Scrambled)
+  mutate(
+    modality = case_when(
+      str_detect(condition, "Scrambled") ~ "Scrambled",
+      !str_detect(condition, "Scrambled") ~ "Normal"
+    ),
+    stimulus = case_when(
+      str_detect(condition, "Cars") ~ "Cars",
+      str_detect(condition, "Faces") ~ "Faces"
+    )
+  ) %>% 
+  # Removes the variable condition. We don't need it anymore!
+  select(-condition) %>%
+  # Filter the time points of interest
+  filter(time < 180, time > 140) %>% 
+  # Creates mean value per each ID, roi, stimulus and modality
+  group_by(ID, stimulus, modality, roi) %>%
+  summarise(M = mean(amplitude)) %>% 
+  ungroup()
 
-levels(D$ROI)
-
-D=all_erp %>% 
-  lapply(., pivot_longer, -time, names_to = "elec", values_to = "amplitude") %>% 
-  bind_rows(.id = "tmp_ID") %>% 
-  separate(tmp_ID, c("ID", "condition"), "_") %>% 
-  filter(time > 140, time < 180) %>% 
-  mutate(electrode = elec) %>% 
-  select(-elec) %>% 
-  group_by(ID, condition,ROI) %>%
-  summarise(amplitude = mean(amplitude))
-
-
+head(D)
 
 ```
 
