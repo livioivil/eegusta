@@ -191,27 +191,16 @@ res
 
 ```{r}
 library(permuco)
-DD1=cbind(Y=dati[,3],Channel=1,
-          Scrambled=as.numeric(dati$Scrambled), 
-          Cars_Faces=as.numeric(dati$Cars_Faces),
-          Subj=dati$Subj)
-DD2=cbind(Y=dati[,4],Channel=2,
-          Scrambled=as.numeric(dati$Scrambled), 
-          Cars_Faces=as.numeric(dati$Cars_Faces),
-          Subj=dati$Subj)
 
+DD=dati[,-c(1:2,5)] %>%
+  pivot_longer(c("Post_Left","Post_Right"), names_to = "Channel", values_to = "Y")
 
-DD=data.frame(rbind(DD1,DD2))
-DD$Scrambled=factor(DD$Scrambled)
-levels(DD$Scrambled)=levels(dati$Scrambled)
-DD$Cars_Faces=factor(DD$Cars_Faces)
-levels(DD$Cars_Faces)=levels(dati$Cars_Faces)
-DD$Channel=factor(DD$Channel)
-levels(DD$Channel)=c("Post_Left","Post_Right")
-
-
+str(DD)
+DD$Y=as.vector(DD$Y)
 
 mod_permuco <- aovperm(Y~Scrambled*Cars_Faces*Channel + Error(Subj/(Scrambled*Cars_Faces*Channel)), data = DD, method = "Rd_kheradPajouh_renaud")
+
+mod_permuco
 
 ```
 
