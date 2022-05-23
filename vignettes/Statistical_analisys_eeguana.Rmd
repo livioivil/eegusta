@@ -140,7 +140,7 @@ A VOI...
 
 # Test di permutazione per Misure Ripetute 
 
-## random coefficient analsys: Un modello per soggetto + Symmetry testing (i.e. 1 sample)
+## Random coefficient analsys: Un modello per soggetto + Symmetry testing (i.e. 1 sample)
 
 Potremmo usare i dati in formato Long con la stessa logica usata per i mixed models.
 Oppure possiamo analizzare i 4 (meta-)canali separatamente. In questa esercitazione scegliamo questa seconda possibilità
@@ -167,23 +167,23 @@ contrasts(dati$Cars_Faces)=contr.sum
 mod=obs2coeffWithin(Y~Cars_Faces*Scrambled, units=~Subj, data=dati)
 
 Y=mod$coeffWithin
+Intercette=Y[,grep("Intercept",colnames(Y))]
 Y=Y[,-grep("Intercept",colnames(Y))]
 
-Y=Y[,1:6]
+Y=Y[,7:12]
 main=(Y[,1:3]+Y[,4:6])
-colnames(main)=gsub("^Ant_Left:","",colnames(main))
+colnames(main)=gsub("^Post_Left:","",colnames(main))
 interact=(Y[,1:3]-Y[,4:6])
-colnames(interact)=gsub("^Ant_Left:","Channel:",colnames(interact))
+colnames(interact)=gsub("^Post_Left:","Channel:",colnames(interact))
 
 
-Y=cbind(main,Channel=rowMeans(interact),interact)
+Y=cbind(main,Channel=Intercette[,3]-Intercette[,4],interact)
 res=flip::flip(Y,perms = 10000)
 summary(res)
 #pvals=flip::t2p(res,obs.only = TRUE)[,]
 
 #summary(pvals)
 
-res
 
 ```
 
