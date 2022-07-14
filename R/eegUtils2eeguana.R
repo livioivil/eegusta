@@ -16,6 +16,7 @@
 #' @importFrom data.table data.table
 #' @importFrom dplyr tibble 
 #' @importFrom eeguana eeg_lst
+#' @importFrom eeguana sample_int
 #' @importFrom eeguana channel_dbl
 #' @importFrom data.table as.data.table
 #' 
