@@ -381,10 +381,13 @@ pre code {
 <li><a href="#anova-per-misure-ripetute">Anova per Misure
 ripetute</a></li>
 <li><a href="#linear-mixed-model">Linear Mixed Model</a></li>
-<li><a href="#test-di-permutazione-per-misure-ripetute-random-coefficient-analsys">Test
-di permutazione per Misure Ripetute (random coefficient analsys)</a>
+<li><a href="#test-di-permutazione-per-misure-ripetute">Test di
+permutazione per Misure Ripetute</a>
 <ul>
-<li><a href="#un-modello-per-soggetto">Un modello per soggetto</a></li>
+<li><a href="#random-coefficient-analsys-un-modello-per-soggetto-symmetry-testing-i.e.-1-sample">Random
+coefficient analsys: Un modello per soggetto + Symmetry testing (i.e. 1
+sample)</a></li>
+<li><a href="#permuco">Permuco</a></li>
 </ul></li>
 </ul>
 </div>
@@ -566,11 +569,11 @@ dati$.recording &lt;- dati$.sample &lt;- dati$.id &lt;- NULL</code></pre>
 <h1>Linear Mixed Model</h1>
 <p>A VOI…</p>
 </div>
-<div id="test-di-permutazione-per-misure-ripetute-random-coefficient-analsys" class="section level1">
-<h1>Test di permutazione per Misure Ripetute (random coefficient
-analsys)</h1>
-<div id="un-modello-per-soggetto" class="section level2">
-<h2>Un modello per soggetto</h2>
+<div id="test-di-permutazione-per-misure-ripetute" class="section level1">
+<h1>Test di permutazione per Misure Ripetute</h1>
+<div id="random-coefficient-analsys-un-modello-per-soggetto-symmetry-testing-i.e.-1-sample" class="section level2">
+<h2>Random coefficient analsys: Un modello per soggetto + Symmetry
+testing (i.e. 1 sample)</h2>
 <p>Potremmo usare i dati in formato Long con la stessa logica usata per
 i mixed models. Oppure possiamo analizzare i 4 (meta-)canali
 separatamente. In questa esercitazione scegliamo questa seconda
@@ -596,29 +599,84 @@ contrasts(dati$Cars_Faces)=contr.sum
 mod=obs2coeffWithin(Y~Cars_Faces*Scrambled, units=~Subj, data=dati)
 
 Y=mod$coeffWithin
+Intercette=Y[,grep(&quot;Intercept&quot;,colnames(Y))]
 Y=Y[,-grep(&quot;Intercept&quot;,colnames(Y))]
 
-res=flip::flip(Y,perms = 10000)
-pvals=flip::t2p(res,obs.only = TRUE)[,]
+Y=Y[,7:12]
+main=(Y[,1:3]+Y[,4:6])
+colnames(main)=gsub(&quot;^Post_Left:&quot;,&quot;&quot;,colnames(main))
+interact=(Y[,1:3]-Y[,4:6])
+colnames(interact)=gsub(&quot;^Post_Left:&quot;,&quot;Channel:&quot;,colnames(interact))
 
-summary(pvals)</code></pre>
-<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##  0.0574  0.1593  0.3705  0.3936  0.5039  0.9614</code></pre>
-<pre class="r"><code>res</code></pre>
+
+Y=cbind(main,Channel=Intercette[,3]-Intercette[,4],interact)
+res=flip::flip(Y,perms = 10000)
+summary(res)</code></pre>
+<pre><code>##  Call:
+##  flip::flip(Y = Y, perms = 10000) 
+## 9999 permutations.
+## 
+##                                Test    Stat tail p-value sig.
+## Cars_Faces1                       t  0.7355   &gt;&lt;  0.4588     
+## Scrambled1                        t -1.5365   &gt;&lt;  0.1298     
+## Cars_Faces1.Scrambled1            t -1.2786   &gt;&lt;  0.2076     
+## Channel                           t  2.1960   &gt;&lt;  0.0326    *
+## Channel.Cars_Faces1               t  0.3914   &gt;&lt;  0.7106     
+## Channel.Scrambled1                t -0.8002   &gt;&lt;  0.4370     
+## Channel.Cars_Faces1.Scrambled1    t  0.4106   &gt;&lt;  0.6848</code></pre>
+<pre class="r"><code>#pvals=flip::t2p(res,obs.only = TRUE)[,]
+
+#summary(pvals)</code></pre>
+</div>
+<div id="permuco" class="section level2">
+<h2>Permuco</h2>
+<pre class="r"><code>library(permuco)
+
+DD=dati[,-c(1:2,5)] %&gt;%
+  pivot_longer(c(&quot;Post_Left&quot;,&quot;Post_Right&quot;), names_to = &quot;Channel&quot;, values_to = &quot;Y&quot;)
+
+str(DD)</code></pre>
+<pre><code>## tibble [320 x 5] (S3: tbl_df/tbl/data.frame)
+##  $ Subj      : Factor w/ 40 levels &quot;01&quot;,&quot;02&quot;,&quot;03&quot;,..: 1 1 1 1 1 1 1 1 2 2 ...
+##  $ Scrambled : Factor w/ 2 levels &quot;NotScrambled&quot;,..: 1 1 1 1 2 2 2 2 1 1 ...
+##   ..- attr(*, &quot;contrasts&quot;)= num [1:2, 1] 1 -1
+##   .. ..- attr(*, &quot;dimnames&quot;)=List of 2
+##   .. .. ..$ : chr [1:2] &quot;NotScrambled&quot; &quot;Scrambled&quot;
+##   .. .. ..$ : NULL
+##  $ Cars_Faces: Factor w/ 2 levels &quot;Cars&quot;,&quot;Faces&quot;: 1 1 2 2 1 1 2 2 1 1 ...
+##   ..- attr(*, &quot;contrasts&quot;)= num [1:2, 1] 1 -1
+##   .. ..- attr(*, &quot;dimnames&quot;)=List of 2
+##   .. .. ..$ : chr [1:2] &quot;Cars&quot; &quot;Faces&quot;
+##   .. .. ..$ : NULL
+##  $ Channel   : chr [1:320] &quot;Post_Left&quot; &quot;Post_Right&quot; &quot;Post_Left&quot; &quot;Post_Right&quot; ...
+##  $ Y         : &#39;channel_dbl&#39; num [1:320] -0.794 -1.106 -0.11 0.557 -0.97 ...
+##   ..- attr(*, &quot;.x&quot;)= num NA
+##   ..- attr(*, &quot;.y&quot;)= num NA
+##   ..- attr(*, &quot;.z&quot;)= num NA
+##   ..- attr(*, &quot;.reference&quot;)= logi NA</code></pre>
+<pre class="r"><code>DD$Y=as.vector(DD$Y)
+
+mod_permuco &lt;- aovperm(Y~Scrambled*Cars_Faces*Channel + Error(Subj/(Scrambled*Cars_Faces*Channel)), data = DD, method = &quot;Rd_kheradPajouh_renaud&quot;)
+
+mod_permuco</code></pre>
 <pre><code>## 
-##                                   Test    Stat tail p-value
-## Ant_Left.Cars_Faces1                 t  0.0455   &gt;&lt;  0.9614
-## Ant_Left.Scrambled1                  t  1.5031   &gt;&lt;  0.1356
-## Ant_Left.Cars_Faces1.Scrambled1      t  1.4123   &gt;&lt;  0.1672
-## Ant_Right.Cars_Faces1                t -0.8002   &gt;&lt;  0.4446
-## Ant_Right.Scrambled1                 t  1.9018   &gt;&lt;  0.0574
-## Ant_Right.Cars_Faces1.Scrambled1     t -0.2710   &gt;&lt;  0.7926
-## Post_Left.Cars_Faces1                t  0.8597   &gt;&lt;  0.3954
-## Post_Left.Scrambled1                 t -1.8092   &gt;&lt;  0.0750
-## Post_Left.Cars_Faces1.Scrambled1     t -0.9662   &gt;&lt;  0.3456
-## Post_Right.Cars_Faces1               t  0.3957   &gt;&lt;  0.6816
-## Post_Right.Scrambled1                t -0.8667   &gt;&lt;  0.4026
-## Post_Right.Cars_Faces1.Scrambled1    t -1.1764   &gt;&lt;  0.2638</code></pre>
+## Resampling test using Rd_kheradPajouh_renaud to handle nuisance variables and 5000 permutations.
+##                                  SSn dfn    SSd dfd    MSEn   MSEd      F
+## Scrambled                    1.08845   1 17.980  39 1.08845 0.4610 2.3609
+## Cars_Faces                   0.16582   1 11.955  39 0.16582 0.3065 0.5409
+## Channel                      1.62886   1 13.173  39 1.62886 0.3378 4.8224
+## Scrambled:Cars_Faces         0.50045   1 11.939  39 0.50045 0.3061 1.6347
+## Scrambled:Channel            0.10705   1  6.520  39 0.10705 0.1672 0.6403
+## Cars_Faces:Channel           0.01921   1  4.889  39 0.01921 0.1254 0.1532
+## Scrambled:Cars_Faces:Channel 0.02121   1  4.907  39 0.02121 0.1258 0.1686
+##                              parametric P(&gt;F) resampled P(&gt;F)
+## Scrambled                             0.13248          0.1448
+## Cars_Faces                            0.46645          0.4718
+## Channel                               0.03411          0.0312
+## Scrambled:Cars_Faces                  0.20861          0.2066
+## Scrambled:Channel                     0.42845          0.4340
+## Cars_Faces:Channel                    0.69762          0.7008
+## Scrambled:Cars_Faces:Channel          0.68361          0.6822</code></pre>
 </div>
 </div>
 

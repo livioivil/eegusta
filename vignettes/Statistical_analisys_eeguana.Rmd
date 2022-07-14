@@ -138,9 +138,9 @@ A VOI...
 A VOI...
 
 
-# Test di permutazione per Misure Ripetute (random coefficient analsys) 
+# Test di permutazione per Misure Ripetute 
 
-## Un modello per soggetto
+## Random coefficient analsys: Un modello per soggetto + Symmetry testing (i.e. 1 sample)
 
 Potremmo usare i dati in formato Long con la stessa logica usata per i mixed models.
 Oppure possiamo analizzare i 4 (meta-)canali separatamente. In questa esercitazione scegliamo questa seconda possibilità
@@ -167,14 +167,40 @@ contrasts(dati$Cars_Faces)=contr.sum
 mod=obs2coeffWithin(Y~Cars_Faces*Scrambled, units=~Subj, data=dati)
 
 Y=mod$coeffWithin
+Intercette=Y[,grep("Intercept",colnames(Y))]
 Y=Y[,-grep("Intercept",colnames(Y))]
 
+Y=Y[,7:12]
+main=(Y[,1:3]+Y[,4:6])
+colnames(main)=gsub("^Post_Left:","",colnames(main))
+interact=(Y[,1:3]-Y[,4:6])
+colnames(interact)=gsub("^Post_Left:","Channel:",colnames(interact))
+
+
+Y=cbind(main,Channel=Intercette[,3]-Intercette[,4],interact)
 res=flip::flip(Y,perms = 10000)
-pvals=flip::t2p(res,obs.only = TRUE)[,]
+summary(res)
+#pvals=flip::t2p(res,obs.only = TRUE)[,]
 
-summary(pvals)
+#summary(pvals)
 
-res
+
+```
+
+## Permuco
+
+```{r}
+library(permuco)
+
+DD=dati[,-c(1:2,5)] %>%
+  pivot_longer(c("Post_Left","Post_Right"), names_to = "Channel", values_to = "Y")
+
+str(DD)
+DD$Y=as.vector(DD$Y)
+
+mod_permuco <- aovperm(Y~Scrambled*Cars_Faces*Channel + Error(Subj/(Scrambled*Cars_Faces*Channel)), data = DD, method = "Rd_kheradPajouh_renaud")
+
+mod_permuco
 
 ```
 

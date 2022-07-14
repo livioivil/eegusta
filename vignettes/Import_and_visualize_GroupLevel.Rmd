@@ -8,7 +8,6 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F, warning = F, message = F)
 
 # remotes::install_github("craddm/eegUtils")
 # devtools::install_github("bnicenboim/eeguana")
