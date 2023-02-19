@@ -22,7 +22,7 @@
 #' 
 eegUtils2eeguana <- function(data, reference = "", unit = "microvolt", resolution = 1){
   
-  .sample <- sample_int(data$timings$sample,sampling_rate = data$srate)
+  .sample <- sample_int(data$timings$sample, .sampling_rate = data$srate)
   
   .id <- as.integer(data$timings$epoch)
   
