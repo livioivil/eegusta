@@ -40,8 +40,8 @@ read_delim2eeg_data <- function(
   
   epochs <- tibble::new_tibble(list(epoch = 1, participant_id = file, 
                                     recording = file), nrow = 1, class = "epoch_info")
-  if(is.null(elec_position))
-    elec_position=names(sigs)
+  if(is.null(chan_info))
+    chan_info=names(sigs)
   D <- eegUtils:::eeg_data(data = sigs, srate = srate, events = event_table, 
                            timings = timings,chan_info = chan_info, epochs = epochs)
   
