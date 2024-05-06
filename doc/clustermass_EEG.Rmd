@@ -419,7 +419,7 @@ The object `graph` is an `igraph` object that computes the channels' adjacency m
 plot(graph)
 ```
 
-How do you choose $delta$? I simply increased the value of $delta$ until the `position_to_graph` function returns the following warning:
+How do you choose $\delta$? I simply increased the value of $\delta$ until the `position_to_graph` function returns the following warning:
 
 `Warning: This graph has more than 1 cluster. It is not valid for a clustermass test. Check the position of the channels or increase delta.`
 
@@ -483,7 +483,7 @@ However, our significant clusters say again that at least one combination channe
 So, we can apply ARI to understand the lower bound of the number of true discovery proportion:
 
 ```{r}
-ARIeeg::ARIeeg(model = model, alpha = 0.3)
+ARIeeg::ARIeeg(model = model, alpha = 0.4)
 ```
 
 In this case, the lower bound for TDP equals $0$ for all clusters, also if we consider the significant spatial-temporal clusters. 
@@ -511,7 +511,7 @@ To gain power in case of dependence between tests, we can consider $l_i = \dfrac
 
 
 ```{r}
-alpha <- 0.3
+alpha <- 0.4
 Test <- model$multiple_comparison$condition$uncorrected$distribution
 dim(Test) <- c(dim(Test)[1], dim(Test)[2]*dim(Test)[3])
 
@@ -541,7 +541,7 @@ lines((c(1:nrow(pv))*alpha)/nrow(pv), col = "green") #plot l_i ARI
 Since $\lambda_{\alpha} > \alpha$ the permutation approach will outperfom ARI:
 
 ```{r}
-ARIeeg::ARIpermEEG(model = model, family = "simes", alpha = 0.3)
+ARIeeg::ARIpermEEG(model = model, family = "simes", alpha = 0.4)
 ```
 
 
