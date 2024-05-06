@@ -500,7 +500,7 @@ $$\bar{a}(S) = \max_{1 \le u \le |S|} 1 - u + |\{i \in S, p_i \le l_u\}|$$
 
 where $S$ is the set of hypothesis of interest (i.e., cluster), $p_i$ is the raw p-values and $l_i$ a suitable vector such that 
 
-$$\Pr(\cap_{i = 1}^{|N|} \{q_{(i)} \ge l_i\}) \le 1-\alpha$$
+$$\Pr(\cap_{i = 1}^{|N|} \{q_{(i)} \ge l_i\}) \ge 1-\alpha$$
 
 where $N$ is the unknown set of inactive time-points/channels and $q_{(i)}$ are their
 sorted $p$-values. In other words, the curve of the sorted $p$-values corresponding to inactive time-points/channels should lie completely above the $l_i$ with probability at least $1 − \alpha$.
