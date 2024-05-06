@@ -212,9 +212,12 @@ We have this model for each time point $t \in \{1, \dots, 500\}$ and each channe
 
 This method has been proposed by [Maris and Oostenveld, 2007](https://doi.org/10.1016/j.jneumeth.2007.03.024). It assumes that an effect will appear in clusters of adjacent time frames. Having statistics for each time point, we form these clusters using a threshold $\tau$ as follows:
 
-<div style="text-align:center" markdown="1">
-![Example of cluster mass EEG from [Frossard, 2019](10.13097/archive-ouverte/unige:125617)](Image/clusterMass.JPG){width=50%}
-</div>
+
+
+```{r, echo=FALSE, fig.cap= "Example of cluster mass EEG from Frossard 2019"}
+knitr::include_graphics("../vignettes/Image/clusterMass.jpg")
+```
+
 
 All contiguous time points with statistics above this threshold define a single cluster $C_i$ with $i \in \{1, \dots, n_C\}$, where $n_C$ is the number of clusters found. 
 
@@ -224,7 +227,7 @@ Typically, it is the sum of the $F$ statistics. The null distribution of the clu
 
 The contribution of a permutation to the cluster-mass null distribution is the maximum overall cluster masses of that permutation. So for each $P \in \mathcal{P}$:
 
-- compute the $t$ permuted statistics
+- compute the $n_{\text{time-points}}$ permuted statistics
 - Find the $n_C^\star$ clusters $C_i^\star$ considering the same threshold $\tau$
 - Compute $m_i^\star = f(C_i^\star)$
 - Find the maximum over $i = \{1, \dots, n_C^\star\}$
@@ -251,9 +254,10 @@ Once we have a definition of **spatial contiguity**, we need to define temporal 
 
 The final graph has a total number of vertices, i.e., the number of tests, equals ($n_{\text{channels}} \times n_{\text{time-points}}$). The following figure shows an example with $64$ channels and $3$ time measures:
 
-<div style="text-align:center" markdown="1">
-![Example of graph of adjacency from [Frossard, 2019](10.13097/archive-ouverte/unige:125617)](Image/cluster.JPG){width=50%}
-</div>
+
+```{r, echo=FALSE, fig.cap= "Example of graph of adjacency from Frossard 2019"}
+knitr::include_graphics("../vignettes/Image/cluster.JPG")
+```
 
 We compute for each spatial-temporal cluster the cluster-mass statistic as before. We then delete all the vertices in which statistics are below a threshold, e.g., the $95$ percentile of the null distribution of the $F$ statistics. So, we have a new graph composed of **multiple connected components**, where each connected component defines the spatial-temporal cluster. 
 
